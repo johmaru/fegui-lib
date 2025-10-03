@@ -2,6 +2,8 @@ const std = @import("std");
 const zsdl = @import("zsdl2");
 const zgui = @import("zgui");
 
+pub export var NvOptimusEnablement: c_uint = 1;
+pub export var AmdPowerXpressRequestHighPerformance: c_uint = 1;
 
 const Window = struct {
     window_handle: *zsdl.Window,
@@ -11,9 +13,31 @@ const Window = struct {
     alloc: std.mem.Allocator,
 
     pub fn init(settings: WindowSettings, alloc: std.mem.Allocator) !Window {
-        _ = try zsdl.gl.setAttribute(.context_major_version, 3);
-        _ = try zsdl.gl.setAttribute(.context_minor_version, 3);
-        _ = try zsdl.gl.setAttribute(.context_profile_mask, @intFromEnum(zsdl.gl.Profile.core));
+        _ = zsdl.gl.setAttribute(.context_major_version, 3) catch |err| {
+            std.debug.print("Failed to set OpenGL major version: {}\n", .{err});
+            return err;
+        };
+        _ = zsdl.gl.setAttribute(.context_minor_version, 3) catch |err| {
+            std.debug.print("Failed to set OpenGL minor version: {}\n", .{err});
+            return err;
+        };
+        _ = zsdl.gl.setAttribute(.context_profile_mask, @intFromEnum(zsdl.gl.Profile.core)) catch |err| {
+            std.debug.print("Failed to set OpenGL profile: {}\n", .{err});
+            return err;
+        };
+
+        _ = zsdl.gl.setAttribute(.doublebuffer, 1) catch |err| {
+            std.debug.print("Failed to enable double buffering: {}\n", .{err});
+            return err;
+        };
+        _ = zsdl.gl.setAttribute(.depth_size, 24) catch |err| {
+            std.debug.print("Failed to set OpenGL depth size: {}\n", .{err});
+            return err;
+        };
+        _ = zsdl.gl.setAttribute(.stencil_size, 8) catch |err| {
+            std.debug.print("Failed to set OpenGL stencil size: {}\n", .{err});
+            return err;
+        };
 
         const window = try zsdl.createWindow(
             settings.title,
@@ -46,8 +70,6 @@ const Window = struct {
         zsdl.gl.deleteContext(self.gl_context);
         self.window_handle.destroy();
     }
-
-
 
     pub fn swapBuffers(self: *Window) void {
         zsdl.gl.swapWindow(self.window_handle);
@@ -83,7 +105,6 @@ const Window = struct {
         _ = self;
         zgui.backend.draw();
     }
-
 };
 
 const WindowSettings = struct {
@@ -98,10 +119,10 @@ const WindowSettings = struct {
             .height = 600,
         };
     }
-
 };
 
 test "testing gen window" {
+    std.debug.print("=== Test Start ===\n", .{});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
@@ -109,23 +130,31 @@ test "testing gen window" {
         if (leak == .leak) {
             std.debug.print("Leak detected\n", .{});
             @panic("Memory leak");
-        } 
+        }
     }
     const alloc = gpa.allocator();
 
-    try zsdl.init(.{ .video = true });
+    std.debug.print("Initializing SDL...\n", .{});
+    zsdl.init(.{ .video = true }) catch |err| {
+        std.debug.print("SDL init failed: {}\n", .{err});
+        return err;
+    };
     defer zsdl.quit();
-    
+    std.debug.print("SDL initialized successfully\n", .{});
+
     const settings = WindowSettings.default();
-    var window = try Window.init(settings, alloc);
+    std.debug.print("Creating window...\n", .{});
+    var window = Window.init(settings, alloc) catch |err| {
+        std.debug.print("Window init failed: {}\n", .{err});
+        return err;
+    };
     defer window.deinit();
-    
+    std.debug.print("Window created successfully\n", .{});
+
     const start_time = std.time.milliTimestamp();
     while (window.is_running) {
         window.pollEvents();
-
         window.beginFrame();
-
         zgui.bulletText("Test Window", .{});
         if (zgui.button("Click Me", .{})) {
             std.debug.print("Button clicked!\n", .{});
@@ -138,18 +167,9 @@ test "testing gen window" {
         }
 
         window.render();
-
         window.swapBuffers();
-
         std.time.sleep(16 * std.time.ns_per_ms);
     }
 
-    if (window.is_running) {
-        std.debug.print("test unexpected behavior. Window is still running.\n", .{});
-    } else {
-        std.debug.print("test case passed. Window closed after 5 seconds.\n", .{});
-    }
-
-    // Run your tests on the window here
+    std.debug.print("=== Test End ===\n", .{});
 }
-

@@ -29,11 +29,11 @@ pub fn build(b: *std.Build) void {
     const zopengl = b.dependency("zopengl", .{
         .target = target,
     });
-    
+
     const zsdl = b.dependency("zsdl", .{
         .target = target,
     });
-    
+
     const zgui = b.dependency("zgui", .{
         .target = target,
         .backend = .sdl2_opengl3,
@@ -106,10 +106,10 @@ pub fn build(b: *std.Build) void {
 
     run_exe_unit_tests.setCwd(b.path("zig-out/bin"));
 
-    // Similar to creating the run step earlier, this exposes a `test` step to
-    // the `zig build --help` menu, providing a way for the user to request
-    // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&install_sdl_dlls.step);
+    test_step.dependOn(&install_sdl_ttf_dll.step);
+    test_step.dependOn(&install_sdl_image_dll.step);
     test_step.dependOn(&install_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
 }
