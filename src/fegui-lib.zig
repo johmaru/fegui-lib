@@ -5,7 +5,27 @@ const zgui = @import("zgui");
 pub export var NvOptimusEnablement: c_uint = 1;
 pub export var AmdPowerXpressRequestHighPerformance: c_uint = 1;
 
-const Window = struct {
+pub const gui = struct {
+    pub const setNextWindowPos = zgui.setNextWindowPos;
+    pub const begin = zgui.begin;
+    pub const end = zgui.end;
+    pub const text = zgui.text;
+    pub const button = zgui.button;
+    pub const sliderFloat = zgui.sliderFloat;
+    pub const sliderInt = zgui.sliderInt;
+    pub const checkbox = zgui.checkbox;
+    pub const inputText = zgui.inputText;
+    pub const sameLine = zgui.sameLine;
+    pub const separator = zgui.separator;
+    pub const spacing = zgui.spacing;
+    pub const pushStyleColor = zgui.pushStyleColor;
+    pub const popStyleColor = zgui.popStyleColor;
+
+    pub const BeginFlags = zgui.WindowFlags;
+    pub const Cond = zgui.Condition;
+};
+
+pub const Window = struct {
     window_handle: *zsdl.Window,
     gl_context: zsdl.gl.Context,
     settings: WindowSettings,
@@ -13,6 +33,8 @@ const Window = struct {
     alloc: std.mem.Allocator,
 
     pub fn init(settings: WindowSettings, alloc: std.mem.Allocator) !Window {
+        try zsdl.init(.{ .video = true });
+
         _ = zsdl.gl.setAttribute(.context_major_version, 3) catch |err| {
             std.debug.print("Failed to set OpenGL major version: {}\n", .{err});
             return err;
@@ -69,6 +91,7 @@ const Window = struct {
         zgui.deinit();
         zsdl.gl.deleteContext(self.gl_context);
         self.window_handle.destroy();
+        zsdl.quit();
     }
 
     pub fn swapBuffers(self: *Window) void {
@@ -105,9 +128,20 @@ const Window = struct {
         _ = self;
         zgui.backend.draw();
     }
+
+    pub fn runLoop(self: *Window, frame_callback: fn (self: *Window) void) void {
+        while (self.is_running) {
+            self.pollEvents();
+            self.beginFrame();
+            frame_callback(self);
+            self.render();
+            self.swapBuffers();
+            std.time.sleep(16 * std.time.ns_per_ms);
+        }
+    }
 };
 
-const WindowSettings = struct {
+pub const WindowSettings = struct {
     title: [*:0]const u8,
     width: i32,
     height: i32,
@@ -134,12 +168,6 @@ test "testing gen window" {
     }
     const alloc = gpa.allocator();
 
-    std.debug.print("Initializing SDL...\n", .{});
-    zsdl.init(.{ .video = true }) catch |err| {
-        std.debug.print("SDL init failed: {}\n", .{err});
-        return err;
-    };
-    defer zsdl.quit();
     std.debug.print("SDL initialized successfully\n", .{});
 
     const settings = WindowSettings.default();
