@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // We will also create a module for our other entry point, 'main.zig'.
-    const exe_mod = b.createModule(.{
+    const root_mod = b.createModule(.{
         // `root_source_file` is the Zig "entry point" of the module. If a module
         // only contains e.g. external object files, you can make this `null`.
         // In this case the main source file is merely a path, however, in more
@@ -39,27 +39,22 @@ pub fn build(b: *std.Build) void {
         .backend = .sdl2_opengl3,
     });
 
-    exe_mod.addImport("zopengl", zopengl.module("root"));
-    exe_mod.addImport("zsdl2", zsdl.module("zsdl2"));
-    exe_mod.addImport("zsdl2_ttf", zsdl.module("zsdl2_ttf"));
-    exe_mod.addImport("zsdl2_image", zsdl.module("zsdl2_image"));
-    exe_mod.addImport("zgui", zgui.module("root"));
+    root_mod.addImport("zopengl", zopengl.module("root"));
+    root_mod.addImport("zsdl2", zsdl.module("zsdl2"));
+    root_mod.addImport("zsdl2_ttf", zsdl.module("zsdl2_ttf"));
+    root_mod.addImport("zsdl2_image", zsdl.module("zsdl2_image"));
+    root_mod.addImport("zgui", zgui.module("root"));
 
-    // This creates another `std.Build.Step.Compile`, but this one builds an executable
-    // rather than a static library.
-    const exe = b.addExecutable(.{
+    const lib = b.addStaticLibrary(.{
         .name = "fegui-lib",
-        .root_module = exe_mod,
+        .root_module = root_mod,
     });
 
-    exe.linkLibrary(zgui.artifact("imgui"));
-    linkSdlLibs(exe);
-    exe.linkLibC();
+    lib.linkLibrary(zgui.artifact("imgui"));
+    linkSdlLibs(lib);
+    lib.linkLibC();
 
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
-    b.installArtifact(exe);
+    b.installArtifact(lib);
 
     const install_sdl_dlls = b.addInstallBinFile(b.path("dll/SDL2.dll"), "SDL2.dll");
     const install_sdl_ttf_dll = b.addInstallBinFile(b.path("dll/SDL2_ttf.dll"), "SDL2_ttf.dll");
@@ -69,31 +64,33 @@ pub fn build(b: *std.Build) void {
     b.getInstallStep().dependOn(&install_sdl_ttf_dll.step);
     b.getInstallStep().dependOn(&install_sdl_image_dll.step);
 
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
-    const run_cmd = b.addRunArtifact(exe);
+    const example_exe = b.addExecutable(.{
+        .name = "example",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/example.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
 
-    // By making the run step depend on the install step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    // This is not necessary, however, if the application depends on other installed
-    // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
+    example_exe.root_module.addImport("fegui", root_mod);
+    example_exe.linkLibrary(zgui.artifact("imgui"));
+    linkSdlLibs(example_exe);
+    example_exe.linkLibC();
 
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    b.installArtifact(example_exe);
 
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    const run_example = b.addRunArtifact(example_exe);
+    run_example.setCwd(b.path("zig-out/bin"));
+
+    const run_step = b.step("run", "Run example");
+    run_step.dependOn(&install_sdl_dlls.step);
+    run_step.dependOn(&install_sdl_ttf_dll.step);
+    run_step.dependOn(&install_sdl_image_dll.step);
+    run_step.dependOn(&run_example.step);
 
     const exe_unit_tests = b.addTest(.{
-        .root_module = exe_mod,
+        .root_module = root_mod,
     });
 
     exe_unit_tests.linkLibrary(zgui.artifact("imgui"));

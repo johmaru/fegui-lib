@@ -155,10 +155,11 @@ test "testing gen window" {
     while (window.is_running) {
         window.pollEvents();
         window.beginFrame();
-        zgui.bulletText("Test Window", .{});
-        if (zgui.button("Click Me", .{})) {
-            std.debug.print("Button clicked!\n", .{});
+        zgui.setNextWindowPos(.{ .x = 20, .y = 20, .cond = .always });
+        if (zgui.begin("Fixed Panel", .{ .flags = .{ .no_move = true, .no_resize = true, .no_collapse = true } })) {
+            zgui.text("Hello, World!", .{});
         }
+        zgui.end();
 
         const elapsed = std.time.milliTimestamp() - start_time;
         if (elapsed > 5000) {
