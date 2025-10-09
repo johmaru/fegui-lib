@@ -1,29 +1,10 @@
 const std = @import("std");
-const zsdl = @import("zsdl2");
-const zgui = @import("zgui");
+pub const zsdl = @import("zsdl2");
+pub const zgui = @import("zgui");
+pub const zogl = @import("zopengl");
 
 pub export var NvOptimusEnablement: c_uint = 1;
 pub export var AmdPowerXpressRequestHighPerformance: c_uint = 1;
-
-pub const gui = struct {
-    pub const setNextWindowPos = zgui.setNextWindowPos;
-    pub const begin = zgui.begin;
-    pub const end = zgui.end;
-    pub const text = zgui.text;
-    pub const button = zgui.button;
-    pub const sliderFloat = zgui.sliderFloat;
-    pub const sliderInt = zgui.sliderInt;
-    pub const checkbox = zgui.checkbox;
-    pub const inputText = zgui.inputText;
-    pub const sameLine = zgui.sameLine;
-    pub const separator = zgui.separator;
-    pub const spacing = zgui.spacing;
-    pub const pushStyleColor = zgui.pushStyleColor;
-    pub const popStyleColor = zgui.popStyleColor;
-
-    pub const BeginFlags = zgui.WindowFlags;
-    pub const Cond = zgui.Condition;
-};
 
 pub const Window = struct {
     window_handle: *zsdl.Window,
@@ -65,9 +46,9 @@ pub const Window = struct {
             settings.title,
             zsdl.Window.pos_centered,
             zsdl.Window.pos_centered,
-            settings.width,
-            settings.height,
-            .{ .opengl = true, .shown = true },
+            settings.width.*,
+            settings.height.*,
+            .{ .opengl = true, .shown = true, .resizable = settings.resizable },
         );
 
         const gl_context = try zsdl.gl.createContext(window);
@@ -112,15 +93,24 @@ pub const Window = struct {
                         self.is_running = false;
                     }
                 },
+                .windowevent => {
+                    switch (event.window.event) {
+                        .resized => {
+                            zogl.wrapper.viewport(0, 0, @intCast(self.settings.width.*), @intCast(self.settings.height.*));
+                        },
+                        else => {},
+                    }
+                },
                 else => {},
             }
         }
     }
 
     pub fn beginFrame(self: *Window) void {
+        self.window_handle.getSize(self.settings.width, self.settings.height);
         zgui.backend.newFrame(
-            @intCast(self.settings.width),
-            @intCast(self.settings.height),
+            @intCast(self.settings.width.*),
+            @intCast(self.settings.height.*),
         );
     }
 
@@ -143,14 +133,18 @@ pub const Window = struct {
 
 pub const WindowSettings = struct {
     title: [*:0]const u8,
-    width: i32,
-    height: i32,
+    width: *c_int,
+    height: *c_int,
+    resizable: bool,
 
-    pub fn default() WindowSettings {
+    pub fn default(width_ptr: *c_int, height_ptr: *c_int) WindowSettings {
+        width_ptr.* = 800;
+        height_ptr.* = 600;
         return WindowSettings{
             .title = "Fegui Window",
-            .width = 800,
-            .height = 600,
+            .width = width_ptr,
+            .height = height_ptr,
+            .resizable = true,
         };
     }
 };
