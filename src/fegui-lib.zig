@@ -46,8 +46,8 @@ pub const Window = struct {
             settings.title,
             zsdl.Window.pos_centered,
             zsdl.Window.pos_centered,
-            settings.width.*,
-            settings.height.*,
+            @intCast(settings.width.*),
+            @intCast(settings.height.*),
             .{ .opengl = true, .shown = true, .resizable = settings.resizable },
         );
 
@@ -126,7 +126,7 @@ pub const Window = struct {
             frame_callback(self);
             self.render();
             self.swapBuffers();
-            std.time.sleep(16 * std.time.ns_per_ms);
+            zsdl.delay(16);
         }
     }
 };
@@ -152,7 +152,7 @@ pub const WindowSettings = struct {
 test "testing gen window" {
     std.debug.print("=== Test Start ===\n", .{});
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer {
         const leak = gpa.deinit();
         if (leak == .leak) {
@@ -191,7 +191,7 @@ test "testing gen window" {
 
         window.render();
         window.swapBuffers();
-        std.time.sleep(16 * std.time.ns_per_ms);
+        zsdl.delay(16);
     }
 
     std.debug.print("=== Test End ===\n", .{});
